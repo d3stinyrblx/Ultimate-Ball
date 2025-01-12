@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Draggable Paddle Ball Game</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #222;
+            font-family: Arial, sans-serif;
+            color: #fff;
+        }
+
+        #gameCanvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #gameOverScreen {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: #fff;
+            text-align: center;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            flex-direction: column;
+        }
+
+        #gameOverScreen h1 {
+            font-size: 5vw;
+            margin: 20px 0;
+        }
+
+        #gameOverScreen p {
+            font-size: 3vw;
+        }
+
+        #restartButton {
+            padding: 10px 20px;
+            font-size: 3vw;
+            color: #222;
+            background-color: #fff;
+            border: none;
+            cursor: pointer;
+            border-radius: 8px;
+            margin-top: 20px;
+            transition: 0.3s;
+        }
+
+        #restartButton:hover {
+            background-color: #ddd;
+        }
+
+        #timer {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 3vw;
+            color: #fff;
+        }
+
+        @media (min-width: 768px) {
+            #gameOverScreen h1 {
+                font-size: 48px;
+            }
+
+            #gameOverScreen p {
+                font-size: 24px;
+            }
+
+            #restartButton {
+                font-size: 20px;
+            }
+
+            #timer {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="timer">Time: 0s</div>
+
+    <div id="gameOverScreen">
+        <h1>Game Over</h1>
+        <p id="finalScore"></p>
+        <p id="finalTime"></p>
+        <button id="restartButton">Play Again</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const finalScoreText = document.getElementById('finalScore');
+        const finalTimeText = document.getElementById('finalTime');
+        const restartButton = document.getElementById('restartButton');
+        const timerElement = document.getElementById('timer');
+
+        let canvasWidth = window.innerWidth;
+        let canvasHeight = window.innerHeight;
+        let ball, paddle, score, startTime, elapsedTime, timerInterval, gameRunning;
+
+        function initializeGame() {
+            canvas.width = canvasWidth;
+            canvas.height = canvasHeight;
+
+            ball = {
+                x: canvas.width / 2,
+                y: canvas.height / 2,
+                radius: 15,
+                speedX: 4,
+                speedY: 4,
+                color: '#fff'
+            };
+
+            paddle = {
+                width: canvas.width / 6,
+                height: canvas.height / 25,
+                x: (canvas.width - canvas.width / 6) / 2,
+                y: canvas.height - canvas.height / 10,
+                color: '#fff',
+                dragging: false
+            };
+
+            score = 0;
+            elapsedTime = 0;
+            timerElement.textContent = 'Time: 0s';
+            startTime = Date.now();
+            gameRunning = true;
+
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(updateTimer, 1000);
+
+            animate();
+        }
+
+        function drawBall() {
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            ctx.fillStyle = ball.color;
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        function drawPaddle() {
+            ctx.fillStyle = paddle.color;
+            ctx.fillRect(paddle.x, paddle.y, paddle.width, paddle.height);
+        }
+
+        function drawScore() {
+            ctx.font = '24px Arial';
+            ctx.fillStyle = '#fff';
+            ctx.fillText(`Score: ${score}`, 10, 30);
+        }
+
+        function clearCanvas() {
+            ctx.fillStyle = '#222';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function updateBallPosition() {
+            ball.x += ball.speedX;
+            ball.y += ball.speedY;
+
+            // Bounce off walls
+            if (ball.x - ball.radius < 0 || ball.x + ball.radius > canvas.width) {
+                ball.speedX *= -1;
+            }
+
+            if (ball.y - ball.radius < 0) {
+                ball.speedY *= -1;
+            }
+
+            // Paddle collision
+            if (
+                ball.y + ball.radius > paddle.y &&
+                ball.y - ball.radius < paddle.y + paddle.height &&
+                ball.x > paddle.x &&
+                ball.x < paddle.x + paddle.width
+            ) {
+                ball.speedY *= -1;
+                score++;
+                if (score % 5 === 0) {
+                    ball.speedX *= 1.1;
+                    ball.speedY *= 1.1;
+                }
+            }
+
+            // Game over
+            if (ball.y - ball.radius > canvas.height) {
+                gameRunning = false;
+                stopGame();
+            }
+        }
+
+        function updateTimer() {
+            elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+            timerElement.textContent = `Time: ${elapsedTime}s`;
+        }
+
+        function stopGame() {
+            clearInterval(timerInterval);
+            gameOverScreen.style.display = 'flex';
+            finalScoreText.textContent = `Your Score: ${score}`;
+            finalTimeText.textContent = `Your Time: ${elapsedTime}s`;
+        }
+
+        function restartGame() {
+            gameOverScreen.style.display = 'none';
+            initializeGame();
+        }
+
+        function handlePointerDown(event) {
+            const clientX = event.touches ? event.touches[0].clientX : event.clientX;
+            const clientY = event.touches ? event.touches[0].clientY : event.clientY;
+
+            if (
+                clientX > paddle.x &&
+                clientX < paddle.x + paddle.width &&
+                clientY > paddle.y &&
+                clientY < paddle.y + paddle.height
+            ) {
+                paddle.dragging = true;
+            }
+        }
+
+        function handlePointerMove(event) {
+            if (!paddle.dragging) return;
+
+            const clientX = event.touches ? event.touches[0].clientX : event.clientX;
+            paddle.x = clientX - paddle.width / 2;
+
+            // Constrain paddle
+            if (paddle.x < 0) paddle.x = 0;
+            if (paddle.x + paddle.width > canvas.width) paddle.x = canvas.width - paddle.width;
+        }
+
+        function handlePointerUp() {
+            paddle.dragging = false;
+        }
+
+        function animate() {
+            if (gameRunning) {
+                clearCanvas();
+                drawBall();
+                drawPaddle();
+                drawScore();
+                updateBallPosition();
+                requestAnimationFrame(animate);
+            }
+        }
+
+        canvas.addEventListener('mousedown', handlePointerDown);
+        canvas.addEventListener('mousemove', handlePointerMove);
+        canvas.addEventListener('mouseup', handlePointerUp);
+
+        canvas.addEventListener('touchstart', handlePointerDown);
+        canvas.addEventListener('touchmove', handlePointerMove);
+        canvas.addEventListener('touchend', handlePointerUp);
+
+        restartButton.addEventListener('click', restartGame);
+
+        initializeGame();
+    </script>
+</body>
+</html>
